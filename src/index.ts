@@ -60,7 +60,7 @@ let retryToGetLastTradeCount = 0;
 let criteriaArray: CriteriaSimulation[] | undefined = undefined;
 
 // running every 5 minutes - America/Sao_Paulo
-const task = schedule('*/10 * * * *', async () => {
+const task = schedule('*/20 * * * *', async () => {
   criteriaArray = await runCallPut();
 }, {
   scheduled: false,
