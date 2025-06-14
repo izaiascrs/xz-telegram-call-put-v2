@@ -60,7 +60,7 @@ let retryToGetLastTradeCount = 0;
 let criteriaArray: CriteriaSimulation[] | undefined = undefined;
 
 // running every 5 minutes - America/Sao_Paulo
-const task = schedule('*/5 * * * *', async () => {
+const task = schedule('*/10 * * * *', async () => {
   criteriaArray = await runCallPut();
 }, {
   scheduled: false,
@@ -140,6 +140,7 @@ function clearTradeTimeout() {
   if(lastContractIntervalId) {
     clearInterval(lastContractIntervalId);
     lastContractIntervalId = null;
+    lastContractId = undefined;
   }
 }
 
@@ -401,118 +402,55 @@ const subscribeToTicks = (symbol: TSymbol) => {
       if(!candles.length || !ticks.length) return;
       const upTrend = isTrendUp(ticks, 11, ticks.length - 1);
       const candleTrend = calculateCandleTrend(candles, 10, 0.004);
+      const signal = criteriaArray.find((criteria) => criteria.condition(ticks, ticks.length - 1));
       
-      
-      for(const criteria of criteriaArray) {
-        if (criteria.condition(ticks, ticks.length - 1)) {
-          const isPut = criteria.type === "PUT";
-          if(isPut && upTrend) continue;
-          if(!isPut && !upTrend) continue;
-          if(!isPut && candleTrend === "bearish") continue;
-          if(isPut && candleTrend === "bullish") continue;
-          if(candleTrend === "sideways") continue;
-          
-          if (!isTrading) {
-            const amount = moneyManager.calculateNextStake();
-            if (!checkStakeAndBalance(amount)) {
-              stopBot();
-              return;
-            }
-
-            if(isTrading) return;
-
-            isTrading = true;
-            tickCount = 0;
-
-            telegramManager.sendMessage(`🎯 Sinal identificado!\n` + `💰 Valor da entrada: $${amount.toFixed(2)}`);
-          
-            apiManager.augmentedSend("buy", {
-              buy: "1",
-              price: 100,
-              parameters: {
-                symbol,
-                currency: "USD",
-                basis: "stake",
-                duration: tradeConfig.ticksCount,
-                duration_unit: "t",
-                amount: Number(amount.toFixed(2)),
-                contract_type: criteria.type,
-              },
-            }).then((data) => {
-              const contractId = data.buy?.contract_id;
-              lastContractId = contractId;
-              createTradeTimeout();
-            }).catch(err => {
-              console.log("BUY CONTRACT ERROR", err);          
-            });
-            }
+      if (signal) {
+        const isPut = signal.type === "PUT";
+        if(isPut && upTrend) return;
+        if(!isPut && !upTrend) return;
+        if(!isPut && candleTrend === "bearish") return;
+        if(isPut && candleTrend === "bullish") return;
+        if(candleTrend === "sideways") return;
+        
+        if (!isTrading) {
+          const amount = moneyManager.calculateNextStake();
+          if (!checkStakeAndBalance(amount)) {
+            stopBot();
+            return;
           }
+
+          isTrading = true;
+          tickCount = 0;
+
+          telegramManager.sendMessage(
+            `🎯 Sinal identificado!\n` + 
+            `💰 Valor da entrada: $${amount.toFixed(2)}` + 
+            `\n\n${signal.type} - ${signal.name}`
+          );
+        
+          apiManager.augmentedSend("buy", {
+            buy: "1",
+            price: 100,
+            parameters: {
+              symbol,
+              currency: "USD",
+              basis: "stake",
+              duration: tradeConfig.ticksCount,
+              duration_unit: "t",
+              amount: Number(amount.toFixed(2)),
+              contract_type: signal.type,
+            },
+          }).then((data) => {
+            const contractId = data.buy?.contract_id;
+            lastContractId = contractId;
+            createTradeTimeout();
+          }).catch(err => {
+            console.log("BUY CONTRACT ERROR", err);          
+          });
+        }
       }
+
     }
-      
-
-    // const currentTicks = ticksMap.get(symbol) || [];
-    // const cartesianDigits = convertTicksToCartesianDigits(currentTicks, pipSize);
-    // const lastTick = currentTicks[cartesianDigits.length - 1];
-    // const isPattern = checkPattern(cartesianDigits);
-
-    // if (!isAuthorized || !telegramManager.isRunningBot()) return;
-
-    // if(isTrading) {
-    //   if(!tradeWinRateManager.canTrade()) {
-    //     tickCount++;
-
-    //     if(tickCount >= tradeConfig.ticksCount + 1) {
-    //       const entryPrice = currentTicks.at(-11) ?? 0;
-    //       const isWin = lastTick >= entryPrice;
-    //       tradeWinRateManager.updateTradeResult(isWin);
-          
-    //       isTrading = false;
-    //       tickCount = 0;
-    //     }
-    //   }
-
-    //   return;
-    // }
-    
-    // if (isPattern) {
-      
-    //   if(tradeWinRateManager.canTrade()) {
-    //     let amount = moneyManager.calculateNextStake();
-  
-    //     if (!checkStakeAndBalance(amount)) {
-    //       stopBot();
-    //       return;
-    //     }
-  
-    //     telegramManager.sendMessage(
-    //       `🎯 Sinal identificado!\n` +
-    //         `💰 Valor da entrada: $${amount.toFixed(2)}`
-    //     );
-  
-    //     apiManager.augmentedSend("buy", {
-    //       buy: "1",
-    //       price: 100,
-    //       parameters: {
-    //         symbol,
-    //         currency: "USD",
-    //         basis: "stake",
-    //         duration: tradeConfig.ticksCount,
-    //         duration_unit: "t",
-    //         amount: Number(amount.toFixed(2)),
-    //         contract_type: "CALLE",
-    //       },
-    //     }).then((data) => {
-    //       const contractId = data.buy?.contract_id;
-    //       lastContractId = contractId;
-    //       createTradeTimeout();
-    //     }).catch(err => {
-    //       console.log("BUY CONTRACT ERROR", err);          
-    //     });
-    //   }
-
-    //   isTrading = true;
-    // }
     
   }, (err) => {
     console.log("TICKS SUBSCRIPTION ERROR", err);
@@ -622,11 +560,12 @@ async function main() {
     // Se o bot está marcado como rodando mas não tem subscrições, tenta reconectar
     if (telegramManager.isRunningBot() && !subscriptions.ticks) {
       console.log("Tentando reconectar bot...");
+      await clearSubscriptions();
       await startBot();
     } 
     // Se o bot não está marcado como rodando MAS tem subscrições ativas, limpa as subscrições
     else if (!telegramManager.isRunningBot() && (subscriptions.ticks || subscriptions.contracts)) {
-      console.log("Limpando subscrições pendentes...");
+      console.log("Limpando subscrições pendentes...");      
       await clearSubscriptions();
     }
   }, 10_000);
