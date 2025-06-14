@@ -425,7 +425,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
           telegramManager.sendMessage(
             `🎯 Sinal identificado!\n` + 
             `💰 Valor da entrada: $${amount.toFixed(2)}` + 
-            `\n\n${signal.type} - ${signal.name}`
+            `\n${signal.name}`
           );
         
           apiManager.augmentedSend("buy", {

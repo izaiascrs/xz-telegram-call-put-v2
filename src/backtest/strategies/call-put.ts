@@ -457,7 +457,7 @@ function generateCriteria() {
 }
 
 export async function runCallPut() {
-  const count = 20_000;
+  const count = 10_000;
 
   const data = (await loadHistoricalData({
     symbol: "R_100",
@@ -531,9 +531,9 @@ export async function runCallPut() {
 
   const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
 
-  // console.log("Melhores critérios para o lado:", bestSide);
+  console.log("Melhores critérios para o lado:", bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
-  // console.table(resultadosFiltrados);
+  // console.table(bestCriteriosForSide);
   return bestCriteriosForSide;
 }
 
