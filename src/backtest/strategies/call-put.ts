@@ -457,7 +457,7 @@ function generateCriteria() {
 }
 
 export async function runCallPut() {
-  const count = 10_000;
+  const count = 20_000;
 
   const data = (await loadHistoricalData({
     symbol: "R_100",
@@ -523,9 +523,18 @@ export async function runCallPut() {
 
   const bestCriterios = resultadosFiltrados.map((r) => r.criteriaObj);
 
+  const criteriasCount = new Map<string, number>();
+  for (const criterio of bestCriterios) {
+    criteriasCount.set(criterio.type, (criteriasCount.get(criterio.type) || 0) + 1);
+  }
+  const bestSide = (criteriasCount.get("CALL") ?? 0) > (criteriasCount.get("PUT") ?? 0) ? "CALL" : "PUT";
+
+  const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
+
+  // console.log("Melhores critérios para o lado:", bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
-  // console.table(resultadosFiltrados.slice(0, 5));
-  return bestCriterios;
+  // console.table(resultadosFiltrados);
+  return bestCriteriosForSide;
 }
 
 export function isTrendUp(ticks: number[], period: number, i: number, limit: number = 0): boolean {
