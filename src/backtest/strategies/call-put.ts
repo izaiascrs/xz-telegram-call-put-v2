@@ -478,15 +478,18 @@ export async function runCallPut() {
     duracao
   );
   const melhoresOtimizacao = resultadosOtimizacao.filter(
-    (r) => r.winRate >= 0 // 0.525
+    (r) => r.winRate >= 0.525
   );
-
-  // console.log("Melhores critérios na OTIMIZAÇÃO:");
-  // console.table(melhoresOtimizacao.slice(0, 5));
 
   // Valida os melhores critérios nos próximos 5k
   const criteriosParaValidar = melhoresOtimizacao.map((r) => r.criteria);
   const criteriosMap = new Map(melhoresOtimizacao.map((r) => [r.criteria, r]));
+
+  const criteriasCountPrevious = new Map<string, number>();
+  for (const criterio of melhoresOtimizacao) {
+    criteriasCountPrevious.set(criterio.criteriaObj.type, (criteriasCountPrevious.get(criterio.criteriaObj.type) || 0) + 1);
+  }
+  const bestSidePrevious = (criteriasCountPrevious.get("CALL") ?? 0) > (criteriasCountPrevious.get("PUT") ?? 0) ? "CALL" : "PUT";
 
   // Reaplica os critérios encontrados na validação
   const criterios = generateCriteria();
@@ -528,10 +531,14 @@ export async function runCallPut() {
     criteriasCount.set(criterio.type, (criteriasCount.get(criterio.type) || 0) + 1);
   }
   const bestSide = (criteriasCount.get("CALL") ?? 0) > (criteriasCount.get("PUT") ?? 0) ? "CALL" : "PUT";
+  
+  console.log("Melhores critérios", bestSide, " - ", bestSidePrevious);
+
+  if(bestSide !== bestSidePrevious) {
+    return [];
+  }
 
   const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
-
-  console.log("Melhores critérios para o lado:", bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
   // console.table(bestCriteriosForSide);
   return bestCriteriosForSide;

@@ -60,7 +60,7 @@ let retryToGetLastTradeCount = 0;
 let criteriaArray: CriteriaSimulation[] | undefined = undefined;
 
 // running every 5 minutes - America/Sao_Paulo
-const task = schedule('*/20 * * * *', async () => {
+const task = schedule('*/10 * * * *', async () => {
   criteriaArray = await runCallPut();
 }, {
   scheduled: false,
@@ -285,6 +285,9 @@ const clearSubscriptions = async () => {
     // waitingVirtualLoss = false;
     isAuthorized = false;
     ticksMap.clear();
+
+    console.log("Subscrições limpas. Total agora:", activeSubscriptions.length);
+
     
   } catch (error) {
     console.error("Erro ao limpar subscrições:", error);
@@ -326,6 +329,8 @@ const stopBot = async () => {
 };
 
 const subscribeToTicks = (symbol: TSymbol) => {
+  console.log("Subscribing to ticks", symbol);
+
   const ticksStream = apiManager.augmentedSubscribe("ticks_history", {
     ticks_history: symbol,
     granularity: 60,
@@ -388,11 +393,11 @@ const subscribeToTicks = (symbol: TSymbol) => {
     if (!isAuthorized || !telegramManager.isRunningBot()) return;
 
     if(isTrading) {
-      tickCount++;
-      if(tickCount >= tradeConfig.ticksCount + 1) {
-        isTrading = false;
-        tickCount = 0;
-      }
+      // tickCount++;
+      // if(tickCount >= tradeConfig.ticksCount + 1) {
+      //   isTrading = false;
+      //   tickCount = 0;
+      // }
       return;
     }
 
@@ -420,13 +425,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
           }
 
           isTrading = true;
-          tickCount = 0;
-
-          telegramManager.sendMessage(
-            `🎯 Sinal identificado!\n` + 
-            `💰 Valor da entrada: $${amount.toFixed(2)}` + 
-            `\n${signal.name}`
-          );
+          tickCount = 0;          
         
           apiManager.augmentedSend("buy", {
             buy: "1",
@@ -441,6 +440,11 @@ const subscribeToTicks = (symbol: TSymbol) => {
               contract_type: signal.type,
             },
           }).then((data) => {
+            telegramManager.sendMessage(
+              `🎯 Sinal identificado!\n` + 
+              `💰 Valor da entrada: $${amount.toFixed(2)} \n` + 
+              `⚡ ${signal.type}`
+            );
             const contractId = data.buy?.contract_id;
             lastContractId = contractId;
             createTradeTimeout();
@@ -513,7 +517,7 @@ const authorize = async () => {
 
 // Adicionar verificação periódica do estado do bot
 setInterval(async () => {
-  if (telegramManager.isRunningBot() && !isTrading && !waitingVirtualLoss && moneyManager.getCurrentBalance() > 0) {
+  if (telegramManager.isRunningBot() && !waitingVirtualLoss && moneyManager.getCurrentBalance() > 0) {
     // Verificar se o bot está "travado"
     const lastActivity = Date.now() - lastActivityTimestamp;
     if (lastActivity > (60_000 * 40)) { // 40 minutos sem atividade
