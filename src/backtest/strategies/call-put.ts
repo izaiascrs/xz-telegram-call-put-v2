@@ -532,7 +532,7 @@ export async function runCallPut() {
   }
   const bestSide = (criteriasCount.get("CALL") ?? 0) > (criteriasCount.get("PUT") ?? 0) ? "CALL" : "PUT";
   
-  console.log("Melhores critérios", bestSide, " - ", bestSidePrevious);
+  // console.log("Melhores critérios", bestSide, " - ", bestSidePrevious);
 
   if(bestSide !== bestSidePrevious) {
     return [];
@@ -541,7 +541,13 @@ export async function runCallPut() {
   const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
   // console.table(bestCriteriosForSide);
-  return bestCriteriosForSide;
+  
+  // Se houver critérios para o lado escolhido, retorna o melhor
+  if(bestCriteriosForSide.length > 0) {
+    return [bestCriteriosForSide[0]];
+  }
+  // Se não houver critérios para o lado escolhido, retorna vazio
+  return [];
 }
 
 export function isTrendUp(ticks: number[], period: number, i: number, limit: number = 0): boolean {
