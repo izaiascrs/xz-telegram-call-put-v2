@@ -534,9 +534,9 @@ export async function runCallPut() {
   
   // console.log("Melhores critérios", bestSide, " - ", bestSidePrevious);
 
-  if(bestSide !== bestSidePrevious) {
-    return [];
-  }
+  // if(bestSide !== bestSidePrevious) {
+  //   return [];
+  // }
 
   const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
@@ -544,7 +544,7 @@ export async function runCallPut() {
   
   // Se houver critérios para o lado escolhido, retorna o melhor
   if(bestCriteriosForSide.length > 0) {
-    return [bestCriteriosForSide[0]];
+    return bestCriteriosForSide.slice(0, 2);
   }
   // Se não houver critérios para o lado escolhido, retorna vazio
   return [];
