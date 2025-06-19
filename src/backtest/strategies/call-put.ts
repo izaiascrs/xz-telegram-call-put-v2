@@ -544,7 +544,7 @@ export async function runCallPut() {
   
   // Se houver critérios para o lado escolhido, retorna o melhor
   if(bestCriteriosForSide.length > 0) {
-    return bestCriteriosForSide.slice(0, 2);
+    return bestCriteriosForSide.slice(0, 5);
   }
   // Se não houver critérios para o lado escolhido, retorna vazio
   return [];
