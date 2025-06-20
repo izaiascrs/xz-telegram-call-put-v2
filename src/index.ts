@@ -417,9 +417,9 @@ const subscribeToTicks = (symbol: TSymbol) => {
         if(isCall && candleTrend === "bearish") return;
         if(isPut && candleTrend === "bullish") return;
         if(candleTrend === "sideways") return;
-        const candleMicroTrend = calculateCandleTrend(candles, 3, 0.0003);
-        if(isPut && candleMicroTrend === "bullish") return;
-        if(isCall && candleMicroTrend === "bearish") return;
+        // const candleMicroTrend = calculateCandleTrend(candles, 3, 0.0003);
+        // if(isPut && candleMicroTrend === "bullish") return;
+        // if(isCall && candleMicroTrend === "bearish") return;
         
         if (!isTrading) {
           const amount = moneyManager.calculateNextStake();
