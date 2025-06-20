@@ -334,7 +334,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
   const ticksStream = apiManager.augmentedSubscribe("ticks_history", {
     ticks_history: symbol,
     granularity: 60,
-    count: 21 as unknown as undefined,
+    count: 30 as unknown as undefined,
     end: 'latest',
     style: 'candles',
     adjust_start_time: 1,
@@ -375,7 +375,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
       const candles = symbolData?.candles ?? [];
       const ticks = symbolData?.ticks ?? [];
 
-      if(candles.length > 10) candles.shift();
+      if(candles.length > 30) candles.shift();
 
       if(ticks.length > 20) ticks.shift();
 
@@ -408,14 +408,18 @@ const subscribeToTicks = (symbol: TSymbol) => {
       const upTrend = isTrendUp(ticks, 11, ticks.length - 1);
       const candleTrend = calculateCandleTrend(candles, 10, 0.004);
       const signal = criteriaArray.find((criteria) => criteria.condition(ticks, ticks.length - 1));
-      
+
       if (signal) {
         const isPut = signal.type === "PUT";
+        const isCall = signal.type === "CALL";
         if(isPut && upTrend) return;
-        if(!isPut && !upTrend) return;
-        if(!isPut && candleTrend === "bearish") return;
+        if(isCall && !upTrend) return;
+        if(isCall && candleTrend === "bearish") return;
         if(isPut && candleTrend === "bullish") return;
         if(candleTrend === "sideways") return;
+        const candleMicroTrend = calculateCandleTrend(candles, 3, 0.0003);
+        if(isPut && candleMicroTrend === "bullish") return;
+        if(isCall && candleMicroTrend === "bearish") return;
         
         if (!isTrading) {
           const amount = moneyManager.calculateNextStake();
