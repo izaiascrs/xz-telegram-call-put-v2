@@ -29,7 +29,7 @@ const config: MoneyManagementV2 = {
 };
 
 const tradeConfig = {
-  ticksCount: 10, 
+  ticksCount: 1, 
 }
 
 let isAuthorized = false;
@@ -133,7 +133,7 @@ function createTradeTimeout() {
     if(lastContractId) {
       getLastTradeResult(lastContractId);
     }
-  }, ((tradeConfig.ticksCount * CONTRACT_SECONDS) * 1000) * 60);
+  }, ((tradeConfig.ticksCount * 1000) * 60) * CONTRACT_SECONDS); // 2 minutes
 }
 
 function clearTradeTimeout() {
@@ -416,10 +416,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
         if(isCall && !upTrend) return;
         if(isCall && candleTrend === "bearish") return;
         if(isPut && candleTrend === "bullish") return;
-        if(candleTrend === "sideways") return;
-        // const candleMicroTrend = calculateCandleTrend(candles, 3, 0.0003);
-        // if(isPut && candleMicroTrend === "bullish") return;
-        // if(isCall && candleMicroTrend === "bearish") return;
+        if(candleTrend === "sideways") return;        
         
         if (!isTrading) {
           const amount = moneyManager.calculateNextStake();
@@ -439,7 +436,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
               currency: "USD",
               basis: "stake",
               duration: tradeConfig.ticksCount,
-              duration_unit: "t",
+              duration_unit: "m",
               amount: Number(amount.toFixed(2)),
               contract_type: signal.type,
             },
