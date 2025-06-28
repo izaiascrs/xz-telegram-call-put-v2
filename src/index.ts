@@ -427,6 +427,12 @@ const subscribeToTicks = (symbol: TSymbol) => {
 
           isTrading = true;
           tickCount = 0;          
+
+          // Aplicar inversão se o modo inverso estiver ativo
+          let finalSignalType = signal.type;
+          if (telegramManager.isInverseModeActive()) {
+            finalSignalType = signal.type === "CALL" ? "PUT" : "CALL";
+          }
         
           apiManager.augmentedSend("buy", {
             buy: "1",
@@ -438,13 +444,14 @@ const subscribeToTicks = (symbol: TSymbol) => {
               duration: tradeConfig.ticksCount,
               duration_unit: "m",
               amount: Number(amount.toFixed(2)),
-              contract_type: signal.type,
+              contract_type: finalSignalType === "CALL" ? "CALLE" : "PUTE", // Won if (entry and exit) price are the same
             },
           }).then((data) => {
+            const inverseIndicator = telegramManager.isInverseModeActive() ? " 🔄" : "";
             telegramManager.sendMessage(
               `🎯 Sinal identificado!\n` + 
               `💰 Valor da entrada: $${amount.toFixed(2)} \n` + 
-              `⚡ ${signal.type}`
+              `⚡ ${finalSignalType}${inverseIndicator}`
             );
             const contractId = data.buy?.contract_id;
             lastContractId = contractId;
@@ -512,6 +519,7 @@ const authorize = async () => {
   } catch (err) {
     isAuthorized = false;
     telegramManager.sendMessage("❌ Erro ao autorizar bot na Deriv");
+    await clearSubscriptions();
     return false;
   }
 };

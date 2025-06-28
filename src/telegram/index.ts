@@ -12,6 +12,7 @@ import apiManager from "../ws";
 export class TelegramManager {
   private bot: TelegramBot;
   private isRunning: boolean = false;
+  private isInverseMode: boolean = false;
   private startTime: Date | null = null;
   private trades: { win: number; loss: number } = { win: 0, loss: 0 };
   private balance: number = 0;
@@ -139,6 +140,61 @@ export class TelegramManager {
           "⚠️ Bot estava em execução e foi parado. Use /start para iniciar novamente."
         );
       }
+    });
+
+    // Comando para verificar status do modo inverso (DEVE VIR ANTES do /inverse)
+    this.bot.onText(/\/inverse-status/, (msg) => {
+      if (!this.isAuthorizedChat(msg.chat.id)) return;
+
+      const status = this.isInverseMode ? "🔄 ATIVADO" : "⚡ DESATIVADO";
+      const description = this.isInverseMode ? 
+        "Entradas estão sendo INVERTIDAS (CALL ↔ PUT)" :
+        "Entradas seguem sinais originais";
+
+      const message = 
+        `*🔄 Status do Modo Inverso*\n\n` +
+        `**Estado:** ${status}\n` +
+        `**Descrição:** ${description}\n\n` +
+        `Use /inverse para alternar o modo`;
+
+      this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+    });
+
+    // Comando para ativar modo inverso (DEVE VIR DEPOIS do /inverse-status)
+    this.bot.onText(/^\/inverse$/, (msg) => {
+      if (!this.isAuthorizedChat(msg.chat.id)) return;
+
+      if (!this.isAdminChat(msg.chat.id)) {
+        this.bot.sendMessage(
+          msg.chat.id,
+          "⛔ Apenas o administrador pode alterar o modo de entradas!"
+        );
+        return;
+      }
+
+      this.isInverseMode = !this.isInverseMode;
+      const status = this.isInverseMode ? "🔄 ATIVADO" : "⚡ DESATIVADO";
+      const message = 
+        `*🔄 Modo Inverso ${status}*\n\n` +
+        `${this.isInverseMode ? 
+          "✅ Entradas serão INVERTIDAS:\n" +
+          "CALL → PUT\n" +
+          "PUT → CALL\n\n" +
+          "Use quando o dia estiver ruim para aumentar assertividade!" :
+          "✅ Entradas voltaram ao NORMAL:\n" +
+          "• CALL e PUT seguem sinais originais"
+        }`;
+
+      this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+
+      ALLOWED_CHAT_IDS.forEach((chatId) => {
+        if (chatId !== msg.chat.id) {
+          this.bot.sendMessage(
+            chatId,
+            `🔄 Modo inverso ${this.isInverseMode ? "ativado" : "desativado"} pelo administrador`
+          );
+        }
+      });
     });
 
     this.bot.onText(/\/status/, (msg) => {
@@ -386,10 +442,12 @@ export class TelegramManager {
   private getBasicStatus(): string {
     const runtime = this.startTime ? this.getRuntime() : "Bot não iniciado";
     const winRate = this.calculateWinRate();
+    const inverseStatus = this.getInverseModeStatus();
 
     return (
       `*📊 Status do Bot*\n\n` +
       `*Status:* ${this.isRunning ? "🟢 Ativo" : "🔴 Parado"}\n` +
+      `*Modo Inverso:* ${inverseStatus}\n` +
       `*Tempo em execução:* ${runtime}\n` +
       `*Trades hoje:* ${this.trades.win + this.trades.loss}\n` +
       `*Vitórias:* ${this.trades.win}\n` +
@@ -438,6 +496,19 @@ export class TelegramManager {
     ALLOWED_CHAT_IDS.forEach((chatId) => {
       this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
     });
+  }
+
+  // Métodos para controlar o modo inverso
+  public isInverseModeActive(): boolean {
+    return this.isInverseMode;
+  }
+
+  public setInverseMode(active: boolean) {
+    this.isInverseMode = active;
+  }
+
+  public getInverseModeStatus(): string {
+    return this.isInverseMode ? "🔄 ATIVADO" : "⚡ DESATIVADO";
   }
 
   private formatBrazilianDateTime(
