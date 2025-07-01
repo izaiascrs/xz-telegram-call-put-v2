@@ -530,7 +530,7 @@ export async function runCallPut() {
   for (const criterio of bestCriterios) {
     criteriasCount.set(criterio.type, (criteriasCount.get(criterio.type) || 0) + 1);
   }
-  const bestSide = (criteriasCount.get("CALL") ?? 0) > (criteriasCount.get("PUT") ?? 0) ? "CALL" : "PUT";
+  // const bestSide = (criteriasCount.get("CALL") ?? 0) > (criteriasCount.get("PUT") ?? 0) ? "CALL" : "PUT";
   
   // console.log("Melhores critérios", bestSide, " - ", bestSidePrevious);
 
@@ -538,13 +538,13 @@ export async function runCallPut() {
   //   return [];
   // }
 
-  const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
+  // const bestCriteriosForSide = bestCriterios.filter((r) => r.type === bestSide);
   // console.log("Desempenho dos melhores critérios na VALIDAÇÃO:");
-  // console.table(bestCriteriosForSide);
+  // console.table(bestCriterios);
   
   // Se houver critérios para o lado escolhido, retorna o melhor
-  if(bestCriteriosForSide.length > 0) {
-    return bestCriteriosForSide.slice(0, 5);
+  if(bestCriterios.length > 0) {
+    return bestCriterios;
   }
   // Se não houver critérios para o lado escolhido, retorna vazio
   return [];
@@ -585,4 +585,110 @@ export function calculateCandleTrend(
   if(variacao > limit) return "bullish";
   if(variacao < -limit) return "bearish";
   return "sideways";
+}
+
+export function calculateADX(candles: TCandle[], period: number = 14): { adx: number, plusDi: number, minusDi: number } {
+  if (candles.length < period * 2) {
+    return { adx: 0, plusDi: 0, minusDi: 0 }; // Not enough data
+  }
+
+  let trueRanges: number[] = [];
+  let plusDMs: number[] = [];
+  let minusDMs: number[] = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const current = candles[i];
+    const previous = candles[i - 1];
+
+    const tr1 = current.high - current.low;
+    const tr2 = Math.abs(current.high - previous.close);
+    const tr3 = Math.abs(current.low - previous.close);
+    trueRanges.push(Math.max(tr1, tr2, tr3));
+
+    const upMove = current.high - previous.high;
+    const downMove = previous.low - current.low;
+
+    plusDMs.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDMs.push(downMove > upMove && downMove > 0 ? downMove : 0);
+  }
+
+  // Wilder's Smoothing (Corrected)
+  const wilderSmooth = (data: number[]) => {
+    const smoothed = new Array(data.length).fill(0);
+    // Seed the first value with a simple moving average
+    let sum = 0;
+    for (let i = 0; i < period; i++) {
+      sum += data[i];
+    }
+    smoothed[period - 1] = sum / period;
+
+    // Apply Wilder's smoothing for subsequent values
+    for (let i = period; i < data.length; i++) {
+      smoothed[i] = (smoothed[i - 1] * (period - 1) + data[i]) / period;
+    }
+    return smoothed;
+  };
+
+  const smoothedTRs = wilderSmooth(trueRanges);
+  const smoothedPlusDMs = wilderSmooth(plusDMs);
+  const smoothedMinusDMs = wilderSmooth(minusDMs);
+
+  let dxs: number[] = [];
+  for (let i = period -1; i < smoothedTRs.length; i++) {
+    const atr = smoothedTRs[i];
+    if (atr === 0) {
+      dxs.push(0);
+      continue;
+    }
+    
+    const plusDI = (smoothedPlusDMs[i] / atr) * 100;
+    const minusDI = (smoothedMinusDMs[i] / atr) * 100;
+    
+    const diSum = plusDI + minusDI;
+    if (diSum === 0) {
+      dxs.push(0);
+      continue;
+    }
+    
+    dxs.push((Math.abs(plusDI - minusDI) / diSum) * 100);
+  }
+
+  // The DX array is shorter, so we need to adjust the starting point
+  const adxSmaStart = (period - 1);
+  if (dxs.length < adxSmaStart + period) {
+    return { adx: 0, plusDi: 0, minusDi: 0 }; // Not enough DX values to calculate ADX
+  }
+
+  // Calculate ADX
+  const adxValues = wilderSmooth(dxs);
+
+  if(adxValues.length < 3 || smoothedPlusDMs.length < 3 || smoothedMinusDMs.length < 3) {
+    return { adx: 0, plusDi: 0, minusDi: 0 }; // Not enough ADX values to calculate ADX
+  }
+  
+  
+
+  // if isIncreasing, return 1, if isDecreasing, return -1
+  // we only need to know if isIncreasing or isDecreasing
+  const isIncreasing = adxValues.slice(-3).every((value, index, array) => {
+    if(index === 0) return true;
+    return value > array[index - 1];
+  });
+
+  // if isIncreasing, return 1, if isDecreasing, return -1
+  // check if isIncreasing or isDecreasing on last 3 values
+  const plusDiIncreasing = smoothedPlusDMs.slice(-3).every((value, index, array) => {
+    if(index === 0) return true;
+    return value > array[index - 1];
+  });
+  const minusDiIncreasing = smoothedMinusDMs.slice(-3).every((value, index, array) => {
+    if(index === 0) return true;
+    return value > array[index - 1];
+  });
+
+  return {
+    adx: isIncreasing ? 1 : -1,
+    plusDi: plusDiIncreasing ? 1 : -1,
+    minusDi: minusDiIncreasing ? 1 : -1,
+  };
 }

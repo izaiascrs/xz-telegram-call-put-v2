@@ -9,7 +9,7 @@ import { TelegramManager } from "./telegram";
 import apiManager from "./ws";
 import { DERIV_TOKEN } from "./utils/constants";
 import { TradeWinRateManger } from "./utils/trade-win-rate-manager";
-import { calculateCandleTrend, CriteriaSimulation, isTrendUp, runCallPut } from "./backtest/strategies/call-put";
+import { calculateADX, CriteriaSimulation, runCallPut } from "./backtest/strategies/call-put";
 
 type TSymbol = (typeof symbols)[number];
 const symbols = ["R_100"] as const;
@@ -29,7 +29,7 @@ const config: MoneyManagementV2 = {
 };
 
 const tradeConfig = {
-  ticksCount: 1, 
+  ticksCount: 10, 
 }
 
 let isAuthorized = false;
@@ -334,7 +334,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
   const ticksStream = apiManager.augmentedSubscribe("ticks_history", {
     ticks_history: symbol,
     granularity: 60,
-    count: 30 as unknown as undefined,
+    count: 50 as unknown as undefined,
     end: 'latest',
     style: 'candles',
     adjust_start_time: 1,
@@ -375,7 +375,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
       const candles = symbolData?.candles ?? [];
       const ticks = symbolData?.ticks ?? [];
 
-      if(candles.length > 30) candles.shift();
+      if(candles.length > 50) candles.shift();
 
       if(ticks.length > 20) ticks.shift();
 
@@ -405,18 +405,23 @@ const subscribeToTicks = (symbol: TSymbol) => {
       const ticks = symbolData?.ticks ?? [];
       const candles = symbolData?.candles ?? [];
       if(!candles.length || !ticks.length) return;
-      const upTrend = isTrendUp(ticks, 11, ticks.length - 1);
-      const candleTrend = calculateCandleTrend(candles, 10, 0.004);
-      const signal = criteriaArray.find((criteria) => criteria.condition(ticks, ticks.length - 1));
+      // const upTrend = isTrendUp(ticks, 11, ticks.length - 1);
+      // const candleTrend = calculateCandleTrend(candles, 10, 0.004);
+      const signal = criteriaArray.find((criteria) => criteria.condition(ticks, ticks.length - 1));            
 
       if (signal) {
         const isPut = signal.type === "PUT";
         const isCall = signal.type === "CALL";
-        if(isPut && upTrend) return;
-        if(isCall && !upTrend) return;
-        if(isCall && candleTrend === "bearish") return;
-        if(isPut && candleTrend === "bullish") return;
-        if(candleTrend === "sideways") return;        
+        const adx = calculateADX(candles, 14);
+
+        if(isPut && adx.minusDi <= 0) return;
+        if(isCall && adx.plusDi <= 0) return;
+
+        // if(isPut && upTrend) return;
+        // if(isCall && !upTrend) return;
+        // if(isCall && candleTrend === "bearish") return;
+        // if(isPut && candleTrend === "bullish") return;
+        // if(candleTrend === "sideways") return;        
         
         if (!isTrading) {
           const amount = moneyManager.calculateNextStake();
@@ -442,7 +447,7 @@ const subscribeToTicks = (symbol: TSymbol) => {
               currency: "USD",
               basis: "stake",
               duration: tradeConfig.ticksCount,
-              duration_unit: "m",
+              duration_unit: "t",
               amount: Number(amount.toFixed(2)),
               contract_type: finalSignalType === "CALL" ? "CALLE" : "PUTE", // Won if (entry and exit) price are the same
             },
